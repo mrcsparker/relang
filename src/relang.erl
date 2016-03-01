@@ -4,7 +4,20 @@
 -email("kurei@axcoto.com").
 
 %%-export([connect/1]).
--compile(export_all). %% replace with -export() later, for God's sake!
+
+-export([
+  start/0,
+  stop/0,
+  connect/0, connect/1, connect/2, connect/3,
+  close/1,
+  r/1, r/2,
+  next/1,
+  stream_stop/2,
+  stream_recv/2,
+  stream_poll/2
+]).
+
+%-compile(export_all). %% replace with -export() later, for God's sake!
 
 %% From ql2.proto
 -define(RETHINKDB_VERSION, 16#400c2d20).
@@ -21,23 +34,58 @@ stop() ->
   ok.
 
 %% http://erlang.org/pipermail/erlang-questions/2004-December/013734.html
+
+%% @spec () -> Socket
+%% @doc
+%%    Connects with:
+%%      <ul>
+%%      <li>`Host': `127.0.0.1'</li>
+%%      <li>`Port': `28015'</li>
+%%      <li>`Auth': `No Authentication'</li>
+%%      </ul>
 connect() ->
   connect("127.0.0.1").
 
-connect(RethinkDBHost) ->
-  do_connect(RethinkDBHost, 28015, <<"">>).
+%% @spec (Host) -> Socket
+%%    Host = string() | ip_address()
+%% @doc
+%%    Connects with:
+%%      <ul>
+%%      <li>`Port': `28015'</li>
+%%      <li>`Auth': `No Authentication'</li>
+%%      </ul>
+connect(Host) ->
+  do_connect(Host, 28015, <<"">>).
 
-connect(RethinkDBHost, AuthKey) ->
-  do_connect(RethinkDBHost, 28015, AuthKey).
+%% @spec (Host, Port) -> Socket
+%%    Host = string() | ip_address()
+%%    Port = integer()
+%% @doc
+%%    Connects with:
+%%      <ul>
+%%      <li>`Auth': `No Authentication'</li>
+%%      </ul>
+connect(Host, AuthKey) ->
+  do_connect(Host, 28015, AuthKey).
 
-connect(RethinkDBHost, Port, AuthKey) ->
-  do_connect(RethinkDBHost, Port, AuthKey).
+%% @spec (Host, Port, AuthKey) -> Socket
+%%    Host = string() | ip_address()
+%%    Port = integer()
+%%    AuthKey = string()
+connect(Host, Port, AuthKey) ->
+  do_connect(Host, Port, AuthKey).
 
 do_connect(Host, Port, AuthKey) ->
   {ok, Socket} = gen_tcp:connect(Host, Port, [binary, {packet, 0}, {active, false}]),
   handshake(Socket, AuthKey),
   Socket.
 
+%% @spec (Socket) -> ok | {error, Reason}
+%%    Socket = socket()
+%%    Reason = atom()
+%% @doc
+%%    Closes a RethinkDb connection.
+%% @end
 close(Socket) ->
   gen_tcp:close(Socket).
 
