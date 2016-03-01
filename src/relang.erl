@@ -11,7 +11,7 @@
   connect/0, connect/1, connect/2, connect/3,
   close/1,
   r/1, r/2,
-  next/1,
+  next/2,
   stream_stop/2,
   stream_recv/2,
   stream_poll/2
