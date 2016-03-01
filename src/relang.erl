@@ -74,15 +74,34 @@ r(Socket, RawQuery) ->
   query(Socket, RawQuery).
 
 %%% Fetch next batch
-next({Socket, Token}) ->
+next({Socket, Token, R}, F) ->
+  lists:map(F, R),
+
   Iolist = ["[2]"],
   Length = iolist_size(Iolist),
-  io:format("Block socket <<< waiting for more data from stream~n"),
 
   ok = gen_tcp:send(Socket, [<<Token:64/little-unsigned>>, <<Length:32/little-unsigned>>, Iolist]),
-  {ok, R} = recv(Socket),
+  handle_next_recv(recv(Socket), F, Socket, Token).
+
+handle_next_recv({ok, R}, F, Socket, Token) ->
   Rterm = jsx:decode(R),
-  proplists:get_value(<<"r">>, Rterm).
+  handle_next_recv_value(proplists:get_value(<<"t">>, Rterm), Rterm, F, Socket, Token);
+handle_next_recv({error, ErrReason}, _F, _Socket, _Token) ->
+  io:fwrite("Got Error when receving: ~s ~n", [ErrReason]),
+      {error, ErrReason}.
+
+handle_next_recv_value(?RUNTIME_ERROR, Rterm, _F, _Socket, _Token) ->
+  io:format("Error"),
+  {error, proplists:get_value(<<"r">>, Rterm)};
+handle_next_recv_value(?SUCCESS_ATOM, Rterm, F, _Socket, _Token) ->
+  io:format("response: a single atom"),
+  F(proplists:get_value(<<"r">>, Rterm));
+handle_next_recv_value(?SUCCESS_SEQUENCE, Rterm, _F, _Socket, _Token) ->
+  io:format("response: a sequence"),
+  {ok, proplists:get_value(<<"r">>, Rterm)};
+handle_next_recv_value(?SUCCESS_PARTIAL, Rterm, F, Socket, Token) ->
+  io:format("response: partial. Can use next here"),
+  next({Socket, Token, proplists:get_value(<<"r">>, Rterm)}, F).
 
 %%% Build AST from raw query
 query(RawQuery) ->
@@ -111,33 +130,29 @@ query(Socket, RawQuery, Option) ->
       io:fwrite("Got Error when sending query: ~s ~n", [Reason])
   end,
 
-  handle_recv(recv(Socket), Socket, Token).
+  handle_query_recv(recv(Socket), Socket, Token).
 %%%
 
-handle_recv({ok, R}, Socket, Token) ->
+handle_query_recv({ok, R}, Socket, Token) ->
   Rterm = jsx:decode(R),
-  handle_recv_value(proplists:get_value(<<"t">>, Rterm), Rterm, Socket, Token);
-handle_recv({error, ErrReason}, _Socket, _Token) ->
+  handle_query_recv_value(proplists:get_value(<<"t">>, Rterm), Rterm, Socket, Token);
+handle_query_recv({error, ErrReason}, _Socket, _Token) ->
   io:fwrite("Got Error when receving: ~s ~n", [ErrReason]),
       {error, ErrReason}.
 
-handle_recv_value(?RUNTIME_ERROR, Rterm, _Socket, _Token) ->
+handle_query_recv_value(?RUNTIME_ERROR, Rterm, _Socket, _Token) ->
   io:format("Error"),
   {error, proplists:get_value(<<"r">>, Rterm)};
-handle_recv_value(?SUCCESS_ATOM, Rterm, _Socket, _Token) ->
+handle_query_recv_value(?SUCCESS_ATOM, Rterm, _Socket, _Token) ->
   io:format("response: a single atom"),
   {ok, proplists:get_value(<<"r">>, Rterm)};
-handle_recv_value(?SUCCESS_SEQUENCE, Rterm, _Socket, _Token) ->
+handle_query_recv_value(?SUCCESS_SEQUENCE, Rterm, _Socket, _Token) ->
   io:format("response: a sequence"),
   {ok, proplists:get_value(<<"r">>, Rterm)};
-handle_recv_value(?SUCCESS_PARTIAL, Rterm, Socket, Token) ->
+handle_query_recv_value(?SUCCESS_PARTIAL, Rterm, Socket, Token) ->
   % So we get back a stream, let continous pull query
   io:format("response: partial. Can use next here"),
-
-  Recv = spawn(?MODULE, stream_recv, [Socket, Token]),
-  Pid = spawn(?MODULE, stream_poll, [{Socket, Token}, Recv]),
-
-  {ok, {pid, Pid}, proplists:get_value(<<"r">>, Rterm)}.
+  {cursor, {Socket, Token, proplists:get_value(<<"r">>, Rterm)}}.
 
 %%% When the response_type is SUCCESS_PARTIAL=3, we can call next to send more data
 %next(_Query) ->

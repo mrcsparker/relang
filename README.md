@@ -77,13 +77,40 @@ operation accept.
 Some special function has different syntax such as changefeed and filter
 because they are a bit different.
 
+## Cursor
+
+some queries don't return all data. But only a partial of data. we can
+iterator over the result set use a concept call `cursor`
+
+```Erlang
+{ok, {cursor, Cursor}, _} = relang:r(Connection, [[{db, ["test"]}, {table, ["t4"]}).
+```
+
+## next
+
+next can works with a callback
+
+```Erlang
+relang:next(cursor, fun(V) -> io:format("Value ~p", [V] end))
+```
+or a process
+
+```Erlang
+Pid = spawn(...)
+relang:next(cursor, Pid)
+```
+
 ## Changefeeds
 
 ```
-relang:r(Connection, [[{db, ["test"]}, {table, ["t4"]}, {change, fun(Item) -> io:format(Item) end}).
+Connection = relang:connect("127.0.0.1").
+
+{ok, {cursor, Cursor}, _} = relang:r(Connection, [{db, [<<"test">>]}, {table, [<<"t4">>]}, {changes, fun(Item) -> io:format(Item) end}]).
+
+relang:next(cursor, fun(V) -> io:format("Value ~p~n", [V]) end).
 ```
 
-  * Limit: Only a `change` command in the list
+  * Limit: Only a `changes` command in the list
 
 ## Filter and row
 
