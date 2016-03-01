@@ -6,6 +6,7 @@ ebin
 *.beam
 .DS_Store
 rebar3
+doc
 
 _*
 rethinkdb_data
