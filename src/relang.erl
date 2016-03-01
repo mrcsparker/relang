@@ -96,6 +96,7 @@ query(Socket, RawQuery, Option) ->
 
   case recv(Socket) of
     {ok, R} ->
+      lager:info("Ok"),
       io:format("Ok "),
       io:format(R),
       Rterm = jsx:decode(R),
