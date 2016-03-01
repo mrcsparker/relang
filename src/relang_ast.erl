@@ -87,6 +87,14 @@ db_create(Name) ->
   ]
 .
 
+db_drop(Name) ->
+  [
+    ?DB_DROP,
+    [Name],
+    [{}]
+  ]
+.
+
 db(DbName, O) ->
   [ ?DB, [DbName], O].
 

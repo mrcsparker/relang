@@ -47,6 +47,7 @@
 
 -define(FILTER, 39).
 -define(DB_CREATE, 57).
+-define(DB_DROP, 58).
 -define(db_list, 59).
 -define(table_list, 62).
 -define(TABLE_CREATE, 60).
