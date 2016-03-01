@@ -223,7 +223,7 @@ update(Table, Item, Option) ->
   ].
 
 
-changes(Table, Function) ->
+changes(Table, _Function) ->
   [
    ?CHANGE,
    [Table],
@@ -337,9 +337,9 @@ now() ->
   ]
   .
 
-expr([Op | Rest]) ->
-  Ex = expr(Op)
-  ;
+%expr([Op | _Rest]) ->
+%  Ex = expr(Op)
+%  ;
 expr([]) -> [];
 expr(Op) when is_tuple(Op) ->
   expr([Op])
@@ -383,7 +383,7 @@ default(Item, Value)->
   [?TERMTYPE_DEFAULT, [Item, Value]]
   .
 
-row(Var, Q) ->
+row(_Var, Q) ->
  %   [69, [
  %       [2, [17]],
  %       [67, [
@@ -408,7 +408,7 @@ row(Var, Q) ->
   ]]
   .
 
-gen_var(L) ->
+gen_var(_L) ->
   [20]
   .
 
@@ -420,7 +420,7 @@ count(S) ->
 
 %%% [relang:connect(), [
 %%% ]
-inner_join(Table, F) ->
+inner_join(_Table, _F) ->
   10
   .
 

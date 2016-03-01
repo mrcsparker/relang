@@ -69,16 +69,17 @@ next({Socket, Token}) ->
 query(RawQuery) ->
   relang_ast:make(RawQuery).
 
+token() ->
+  {A1, A2, A3} = erlang:timestamp(),
+  random:seed(A1, A2, A3),
+  random:uniform(3709551616).
+
 %%% Build and Run query when passing Socket
 query(Socket, RawQuery) ->
   query(Socket, RawQuery, [{}]).
 
 query(Socket, RawQuery, Option) ->
-  {A1, A2, A3} = erlang:timestamp(),
-  random:seed(A1, A2, A3),
-  Token = random:uniform(3709551616),
-  %io:format("QueryToken = ~p~n", [Token]),
-
+  Token = token(),
   Query = relang_ast:make(RawQuery),
 
   io:format("Query = ~p ~n", [Query]),
@@ -99,32 +100,31 @@ query(Socket, RawQuery, Option) ->
       io:format(R),
       Rterm = jsx:decode(R),
       %proplists:get_value(<<"r">>, Rterm),
-      case proplists:get_value(<<"t">>, Rterm) of
-        ?RUNTIME_ERROR ->
-          io:format("Error"),
-          {error, proplists:get_value(<<"r">>, Rterm)};
-        ?SUCCESS_ATOM ->
-          io:format("response: a single atom"),
-          {ok, proplists:get_value(<<"r">>, Rterm)};
-        ?SUCCESS_SEQUENCE ->
-          io:format("response: a sequence"),
-          {ok, proplists:get_value(<<"r">>, Rterm)};
-        ?SUCCESS_PARTIAL ->
-          % So we get back a stream, let continous pull query
-          io:format("response: partial. Can use next here"),
-
-          Recv = spawn(?MODULE, stream_recv, [Socket, Token]),
-          Pid = spawn(?MODULE, stream_poll, [{Socket, Token}, Recv]),
-
-          {ok, {pid, Pid}, proplists:get_value(<<"r">>, Rterm)}
-      end
-      ;
+      handle_recv_value(proplists:get_value(<<"t">>, Rterm), Rterm, Socket, Token);
     {error, ErrReason} ->
       io:fwrite("Got Error when receving: ~s ~n", [ErrReason]),
       {error, ErrReason}
   end
   .
 %%%
+
+handle_recv_value(?RUNTIME_ERROR, Rterm, _Socket, _Token) ->
+  io:format("Error"),
+  {error, proplists:get_value(<<"r">>, Rterm)};
+handle_recv_value(?SUCCESS_ATOM, Rterm, _Socket, _Token) ->
+  io:format("response: a single atom"),
+  {ok, proplists:get_value(<<"r">>, Rterm)};
+handle_recv_value(?SUCCESS_SEQUENCE, Rterm, _Socket, _Token) ->
+  io:format("response: a sequence"),
+  {ok, proplists:get_value(<<"r">>, Rterm)};
+handle_recv_value(?SUCCESS_PARTIAL, Rterm, Socket, Token) ->
+  % So we get back a stream, let continous pull query
+  io:format("response: partial. Can use next here"),
+
+  Recv = spawn(?MODULE, stream_recv, [Socket, Token]),
+  Pid = spawn(?MODULE, stream_poll, [{Socket, Token}, Recv]),
+
+  {ok, {pid, Pid}, proplists:get_value(<<"r">>, Rterm)}.
 
 %%% When the response_type is SUCCESS_PARTIAL=3, we can call next to send more data
 %next(_Query) ->
