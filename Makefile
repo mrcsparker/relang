@@ -1,21 +1,31 @@
 PROJECT=relang
-REBAR=$(shell which rebar || echo ./rebar)
-ERLFLAGS= -pa $(CURDIR)/.eunit -pa $(CURDIR)/ebin -pa $(CURDIR)/*/ebin
+REBAR3_URL=https://s3.amazonaws.com/rebar3/rebar3
+
+# If there is a rebar in the current directory, use it
+ifeq ($(wildcard rebar3),rebar3)
+	REBAR3 = $(CURDIR)/rebar3
+endif
+
+# Fallback to rebar on PATH
+REBAR3 ?= $(shell test -e `which rebar3` 2>/dev/null && which rebar3 || echo "rebar3")
+
+# And finally, prep to download rebar if all else fails
+ifeq ($(REBAR3),)
+	REBAR3 = $(CURDIR)/rebar3
+endif
+
 VERSION=0.1.1
 
 .PHONY: all docker
-all: get-deps compile repl
+all: compile repl
 
-get-deps: $(REBAR)
-	@$(REBAR) get-deps
-
-compile: $(REBAR)
-	@$(REBAR) co
+compile: $(REBAR3)
+	@$(REBAR3) compile
 
 test: eunit
 
-eunit: $(REBAR)
-	@$(REBAR) eu skip_deps=true
+eunit: $(REBAR3)
+	@$(REBAR3) eunit
 
 docker:
 	docker build -t kureikain/relang:$(VERSION) .
@@ -25,23 +35,11 @@ push:
 wercker:
 	wercker build --docker-host tcp://192.168.59.103:2376
 
-repl:
-	erl $(ERLFLAGS)
+$(REBAR3):
+	curl -Lo rebar3 $(REBAR3_URL) || wget $(REBAR3_URL)
+	chmod a+x rebar3
 
-APPS = kernel stdlib sasl erts ssl tools os_mon runtime_tools crypto inets \
-	   xmerl webtool snmp public_key mnesia eunit syntax_tools compiler
-COMBO_PLT = .$(PROJECT).plt
+repl: $(REBAR3)
+	$(REBAR3) shell
 
-check_plt: compile
-	dialyzer --check_plt --plt $(COMBO_PLT) --apps $(APPS) deps ebin
 
-build_plt: compile
-	dialyzer --build_plt --output_plt $(COMBO_PLT) --apps $(APPS) deps ebin
-
-dialyzer: compile
-	dialyzer -Wno_return --plt $(COMBO_PLT) ebin
-
-# xref
-
-xref:
-	@$(REBAR) xref skip_deps=true
