@@ -7,9 +7,9 @@
 -compile(export_all). %% replace with -export() later, for God's sake!
 
 %% From ql2.proto
--define(RETHINKDB_VERSION, 32#723081e1).
+-define(RETHINKDB_VERSION, 16#400c2d20).
+-define(RETHINKDB_PROTOCOL, 16#7e6970c7).
 
--include("ql2_pb.hrl").
 -include("term.hrl").
 
 start() ->
@@ -25,22 +25,26 @@ connect() ->
   connect("127.0.0.1").
 
 connect(RethinkDBHost) ->
-  {ok, Sock} = gen_tcp:connect(RethinkDBHost, 28015,
-                               [binary, {packet, 0}, {active, false}]),
-  handshake(Sock, <<"">>),
-  Sock.
+  do_connect(RethinkDBHost, 28015, <<"">>).
 
-close(Sock) ->
-  gen_tcp:close(Sock).
+connect(RethinkDBHost, AuthKey) ->
+  do_connect(RethinkDBHost, 28015, AuthKey).
 
-handshake(Sock, _AuthKey) ->
-  % KeyLength = iolist_size(AuthKey), % TODO: unused
-  ok = gen_tcp:send(Sock, binary:encode_unsigned(16#400c2d20, little)),
-  ok = gen_tcp:send(Sock, [<<0:32/little-unsigned>>]),
-  % Using JSON Protocol
-  ok = gen_tcp:send(Sock, [<<16#7e6970c7:32/little-unsigned>>]),
+connect(RethinkDBHost, Port, AuthKey) ->
+  do_connect(RethinkDBHost, Port, AuthKey).
 
-  {ok, Response} = read_until_null(Sock),
+do_connect(Host, Port, AuthKey) ->
+  {ok, Socket} = gen_tcp:connect(Host, Port, [binary, {packet, 0}, {active, false}]),
+  handshake(Socket, AuthKey),
+  Socket.
+
+close(Socket) ->
+  gen_tcp:close(Socket).
+
+handshake(Socket, AuthKey) ->
+  ok = setup_protocols(Socket, AuthKey),
+
+  {ok, Response} = read_until_null(Socket),
   case Response == <<"SUCCESS",0>> of
     true -> ok;
     false ->
@@ -48,6 +52,21 @@ handshake(Sock, _AuthKey) ->
       {error, Response}
   end.
 
+setup_protocols(Socket, AuthKey) ->
+  ok = send_protocol_version(Socket),
+  ok = send_authorization_key(Socket, AuthKey),
+  send_json_protocol(Socket).
+
+send_protocol_version(Socket) ->
+  lager:info("send_protocol_version"),
+  gen_tcp:send(Socket, binary:encode_unsigned(?RETHINKDB_VERSION, little)).
+
+send_authorization_key(Socket, AuthorizationKey) ->
+  AuthorizationKeyLength = iolist_size(AuthorizationKey),
+  gen_tcp:send(Socket, [<<AuthorizationKeyLength:32/little-unsigned>>, AuthorizationKey]).
+
+send_json_protocol(Socket) ->
+    gen_tcp:send(Socket, [<<?RETHINKDB_PROTOCOL:32/little-unsigned>>]).
 
 %%% RethinkDB API
 r(Q) -> query(Q).
@@ -85,8 +104,6 @@ query(Socket, RawQuery, Option) ->
   io:format("Query = ~p ~n", [Query]),
   Iolist  = jsx:encode([?QUERYTYPE_START, Query, Option]), % ["[1,"] ++ [Query] ++ [",{}]"], % list db 
   Length = iolist_size(Iolist),
-  %io:format("Query= ~p~n", [Iolist]),
-  %io:format("Length: ~p ~n", [Length]),
 
   case gen_tcp:send(Socket, [<<Token:64/little-unsigned>>, <<Length:32/little-unsigned>>, Iolist]) of
     ok -> ok;
@@ -94,20 +111,15 @@ query(Socket, RawQuery, Option) ->
       io:fwrite("Got Error when sending query: ~s ~n", [Reason])
   end,
 
-  case recv(Socket) of
-    {ok, R} ->
-      lager:info("Ok"),
-      io:format("Ok "),
-      io:format(R),
-      Rterm = jsx:decode(R),
-      %proplists:get_value(<<"r">>, Rterm),
-      handle_recv_value(proplists:get_value(<<"t">>, Rterm), Rterm, Socket, Token);
-    {error, ErrReason} ->
-      io:fwrite("Got Error when receving: ~s ~n", [ErrReason]),
-      {error, ErrReason}
-  end
-  .
+  handle_recv(recv(Socket), Socket, Token).
 %%%
+
+handle_recv({ok, R}, Socket, Token) ->
+  Rterm = jsx:decode(R),
+  handle_recv_value(proplists:get_value(<<"t">>, Rterm), Rterm, Socket, Token);
+handle_recv({error, ErrReason}, _Socket, _Token) ->
+  io:fwrite("Got Error when receving: ~s ~n", [ErrReason]),
+      {error, ErrReason}.
 
 handle_recv_value(?RUNTIME_ERROR, Rterm, _Socket, _Token) ->
   io:format("Error"),
