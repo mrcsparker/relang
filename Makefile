@@ -1,19 +1,20 @@
 PROJECT=relang
-REBAR=`which rebar || printf ./rebar`
+REBAR=$(shell which rebar || echo ./rebar)
 VERSION=0.1.1
 
 .PHONY: all docker
 all: get-deps compile repl
 
-get-deps:
-	$(REBAR) get-deps
+get-deps: $(REBAR)
+	@$(REBAR) get-deps
 
-compile: $(REBAR) co
+compile: $(REBAR)
+	@$(REBAR) co
 
 test: eunit
 
-eunit:
-	$(REBAR) eu skip_deps=true
+eunit: $(REBAR)
+	@$(REBAR) eu skip_deps=true
 
 docker:
 	docker build -t kureikain/relang:$(VERSION) .

@@ -83,7 +83,7 @@ db_create(Name) ->
   [
    ?DB_CREATE,
    [Name],
-   {}
+   [{}]
   ]
 .
 

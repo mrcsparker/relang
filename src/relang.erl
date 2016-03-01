@@ -33,8 +33,8 @@ connect(RethinkDBHost) ->
 close(Sock) ->
   gen_tcp:close(Sock).
 
-handshake(Sock, AuthKey) ->
-  KeyLength = iolist_size(AuthKey),
+handshake(Sock, _AuthKey) ->
+  % KeyLength = iolist_size(AuthKey), % TODO: unused
   ok = gen_tcp:send(Sock, binary:encode_unsigned(16#400c2d20, little)),
   ok = gen_tcp:send(Sock, [<<0:32/little-unsigned>>]),
   % Using JSON Protocol
@@ -74,7 +74,7 @@ query(Socket, RawQuery) ->
   query(Socket, RawQuery, [{}]).
 
 query(Socket, RawQuery, Option) ->
-  {A1, A2, A3} = now(),
+  {A1, A2, A3} = erlang:timestamp(),
   random:seed(A1, A2, A3),
   Token = random:uniform(3709551616),
   %io:format("QueryToken = ~p~n", [Token]),
@@ -90,8 +90,7 @@ query(Socket, RawQuery, Option) ->
   case gen_tcp:send(Socket, [<<Token:64/little-unsigned>>, <<Length:32/little-unsigned>>, Iolist]) of
     ok -> ok;
     {error, Reason} ->
-      io:fwrite("Got Error when sending query: ~s ~n", [Reason]),
-      {error, Reason}
+      io:fwrite("Got Error when sending query: ~s ~n", [Reason])
   end,
 
   case recv(Socket) of
@@ -128,8 +127,8 @@ query(Socket, RawQuery, Option) ->
 %%%
 
 %%% When the response_type is SUCCESS_PARTIAL=3, we can call next to send more data
-next(Query) ->
-  continue.
+%next(_Query) ->
+%  continue.
 
 stream_stop(Socket, Token) ->
   Iolist = ["[3]"],
@@ -170,11 +169,11 @@ recv(Socket) ->
       <<K:64/little-unsigned>> = Token,
       io:format("Get back token ~p ~n", [K]),
       io:format("Get back token ~p ~n", [Token]);
-    {error, Reason} ->
+    {error, _Reason} ->
       io:format("Fail to parse token")
   end,
 
-  {RecvResultCode, ResponseLength} = gen_tcp:recv(Socket, 4),
+  {_RecvResultCode, ResponseLength} = gen_tcp:recv(Socket, 4),
   <<Rs:32/little-unsigned>> = ResponseLength,
   io:format("ResponseLengh ~p ~n", [Rs]),
   io:format("ResponseLengh ~p ~n", [ResponseLength]),
