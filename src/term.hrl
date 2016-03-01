@@ -48,8 +48,8 @@
 -define(FILTER, 39).
 -define(DB_CREATE, 57).
 -define(DB_DROP, 58).
--define(db_list, 59).
--define(table_list, 62).
+-define(DB_LIST, 59).
+-define(TABLE_LIST, 62).
 -define(TABLE_CREATE, 60).
 -define(TERMTYPE_TABLE_DROP, 61).
 

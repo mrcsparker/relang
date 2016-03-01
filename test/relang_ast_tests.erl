@@ -4,6 +4,12 @@
 -define(test, ?assertMatch(R, relang_ast:make(Q))).
 -define(showResult, io:format("R = ~p~n", [relang_ast:make(Q)])).
 
+db_create_test() ->
+  ?assertMatch([57,[<<"test">>], [{}]], relang_ast:make([{db_create, <<"test">>}])).
+
+db_drop_test() ->
+  ?assertMatch([58,[<<"test">>], [{}]], relang_ast:make([{db_drop, <<"test">>}])).
+
 db_test() ->
   ?assertMatch([14,[<<"test">>]], relang_ast:make([{db, <<"test">>}])).
 

@@ -106,21 +106,21 @@ db(DbName) ->
 
 db_list() ->
   [
-    ?db_list,
+    ?DB_LIST,
     [],
     [{}]
   ].
 
 table_list(Db) ->
   [
-   ?table_list,
+   ?TABLE_LIST,
    [Db],
    [{}]
   ].
 
-table_list(Db,Option) ->
+table_list(Db, Option) ->
   [
-   ?table_list,
+   ?TABLE_LIST,
    [Db],
    Option
   ].

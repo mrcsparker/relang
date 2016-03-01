@@ -26,3 +26,21 @@ wercker:
 
 repl:
 	erl -pa ebin -pa deps/protobuffs/ebin deps/jsx/ebin
+
+APPS = kernel stdlib sasl erts ssl tools os_mon runtime_tools crypto inets \
+	   xmerl webtool snmp public_key mnesia eunit syntax_tools compiler
+COMBO_PLT = .$(PROJECT).plt
+
+check_plt: compile
+	dialyzer --check_plt --plt $(COMBO_PLT) --apps $(APPS) deps ebin
+
+build_plt: compile
+	dialyzer --build_plt --output_plt $(COMBO_PLT) --apps $(APPS) deps ebin
+
+dialyzer: compile
+	dialyzer -Wno_return --plt $(COMBO_PLT) ebin
+
+# xref
+
+xref:
+	@$(REBAR) xref skip_deps=true
